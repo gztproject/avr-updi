@@ -4,18 +4,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define INTEL_HEX_PAGE_SIZE 512u
+#define INTEL_HEX_MAX_PAGE_SIZE 512u
 
 /** Called with one finished page. Data holes are 0xFF. Return false to stop. */
 typedef bool (*IntelHexPageCallback)(
     uint32_t address,
-    const uint8_t data[INTEL_HEX_PAGE_SIZE],
+    const uint8_t* data,
+    uint16_t page_size,
     void* context);
 
 typedef struct IntelHexParser IntelHexParser;
 
 IntelHexParser* intel_hex_parser_alloc(
     uint32_t max_address,
+    uint16_t page_size,
     IntelHexPageCallback on_page,
     void* context);
 

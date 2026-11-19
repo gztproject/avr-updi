@@ -18,6 +18,7 @@ struct UpdiSession {
     bool open;
     bool prog_mode;
     UpdiTargetInfo target;
+    UpdiNvmFamily sib_family;
 };
 
 static const uint8_t updi_key_nvm[8] = {'N', 'V', 'M', 'P', 'r', 'o', 'g', ' '};
@@ -39,6 +40,18 @@ static void updi_copy_sib(UpdiTargetInfo* info, const uint8_t sib[UPDI_SIB_SIZE]
         end--;
         info->sib[end] = '\0';
     }
+}
+
+static bool updi_session_need_prog(UpdiSession* session) {
+    if(!session->prog_mode) {
+        snprintf(session->error, sizeof(session->error), "Not in prog mode");
+        return false;
+    }
+    if(session->target.profile == NULL) {
+        snprintf(session->error, sizeof(session->error), "Unknown device profile");
+        return false;
+    }
+    return true;
 }
 
 UpdiSession* updi_session_alloc(void) {
@@ -143,9 +156,14 @@ bool updi_session_unlock(UpdiSession* session) {
 }
 
 bool updi_session_read_signature(UpdiSession* session) {
+    uint32_t base = 0x1100u;
+    if(session->target.profile != NULL) base = session->target.profile->sigrow_base;
     uint8_t signature[3];
-    if(!updi_link_read(&session->link, UPDI_SIGROW_BASE, signature, sizeof(signature))) return false;
+    if(!updi_link_read(&session->link, base, signature, sizeof(signature))) return false;
     updi_target_set_signature(&session->target, signature);
+    if(session->target.profile != NULL) {
+        updi_link_set_addr_bytes(&session->link, session->target.profile->addr_bytes);
+    }
     return true;
 }
 
@@ -153,6 +171,8 @@ UpdiConnectStatus updi_session_connect(UpdiSession* session) {
     session->error[0] = '\0';
     memset(&session->target, 0, sizeof(session->target));
     session->prog_mode = false;
+    session->sib_family = UpdiNvmNone;
+    updi_link_set_addr_bytes(&session->link, 3);
 
     if(!updi_transport_open(session->transport)) {
         snprintf(
@@ -167,19 +187,24 @@ UpdiConnectStatus updi_session_connect(UpdiSession* session) {
     if(!updi_link_read_sib(&session->link, sib)) return UpdiConnectFail;
     updi_copy_sib(&session->target, sib);
 
-    if(!(sib[UPDI_SIB_NVM_INDEX] == 'P' && sib[UPDI_SIB_NVM_INDEX + 1] == ':' &&
-         sib[UPDI_SIB_NVM_INDEX + 2] == '2')) {
-        char nvm[4] = {
-            (char)sib[UPDI_SIB_NVM_INDEX],
-            (char)sib[UPDI_SIB_NVM_INDEX + 1],
-            (char)sib[UPDI_SIB_NVM_INDEX + 2],
-            '\0',
-        };
-        snprintf(session->target.nvm, sizeof(session->target.nvm), "%s", nvm);
-        snprintf(session->error, sizeof(session->error), "Unsupported NVM %s", nvm);
+    session->sib_family = updi_nvm_family_from_sib(sib);
+    snprintf(
+        session->target.nvm,
+        sizeof(session->target.nvm),
+        "P:%c",
+        session->sib_family != UpdiNvmNone ? (char)session->sib_family : '?');
+
+    if(!updi_nvm_family_supported(session->sib_family)) {
+        snprintf(
+            session->error,
+            sizeof(session->error),
+            "Unsupported NVM %s",
+            session->target.nvm);
         return UpdiConnectFail;
     }
-    snprintf(session->target.nvm, sizeof(session->target.nvm), "P:2");
+
+    /* P:0 uses 16-bit addressing before signature lookup. */
+    updi_link_set_addr_bytes(&session->link, session->sib_family == UpdiNvmP0 ? 2 : 3);
 
     if(!updi_link_try_fast_baud(&session->link)) return UpdiConnectFail;
     if(!updi_session_enter_progmode(session)) {
@@ -187,6 +212,15 @@ UpdiConnectStatus updi_session_connect(UpdiSession* session) {
         return UpdiConnectFail;
     }
     if(!updi_session_read_signature(session)) return UpdiConnectFail;
+
+    if(session->target.known && session->target.profile->nvm_family != session->sib_family) {
+        snprintf(
+            session->error,
+            sizeof(session->error),
+            "SIB NVM %s mismatches device table",
+            session->target.nvm);
+        return UpdiConnectFail;
+    }
 
     FURI_LOG_I(
         "Updi",
@@ -200,19 +234,14 @@ UpdiConnectStatus updi_session_connect(UpdiSession* session) {
 }
 
 bool updi_session_chip_erase(UpdiSession* session) {
-    if(!session->prog_mode) {
-        snprintf(session->error, sizeof(session->error), "Not in prog mode");
-        return false;
-    }
-    return updi_nvm_chip_erase(&session->link);
+    if(!updi_session_need_prog(session)) return false;
+    return updi_nvm_chip_erase(&session->link, session->target.profile);
 }
 
 bool updi_session_write_page(UpdiSession* session, uint32_t byte_address, const uint8_t* page) {
-    if(!session->prog_mode) {
-        snprintf(session->error, sizeof(session->error), "Not in prog mode");
-        return false;
-    }
-    return updi_nvm_write_flash_page(&session->link, byte_address, page);
+    if(!updi_session_need_prog(session)) return false;
+    return updi_nvm_write_flash_page(
+        &session->link, session->target.profile, byte_address, page);
 }
 
 bool updi_session_read_flash(
@@ -220,19 +249,67 @@ bool updi_session_read_flash(
     uint32_t byte_address,
     uint8_t* data,
     size_t size) {
-    if(!session->prog_mode) {
-        snprintf(session->error, sizeof(session->error), "Not in prog mode");
-        return false;
-    }
-    return updi_nvm_read_flash(&session->link, byte_address, data, size);
+    if(!updi_session_need_prog(session)) return false;
+    return updi_nvm_read_memory(
+        &session->link, session->target.profile->flash_base + byte_address, data, size);
 }
 
-bool updi_session_read_fuses(UpdiSession* session, uint8_t fuses[12]) {
-    if(!session->prog_mode) {
-        snprintf(session->error, sizeof(session->error), "Not in prog mode");
+bool updi_session_read_eeprom(
+    UpdiSession* session,
+    uint32_t byte_address,
+    uint8_t* data,
+    size_t size) {
+    if(!updi_session_need_prog(session)) return false;
+    if(byte_address + size > session->target.profile->eeprom_size) {
+        snprintf(session->error, sizeof(session->error), "EEPROM past end");
         return false;
     }
-    return updi_link_read(&session->link, UPDI_FUSE_BASE, fuses, UPDI_FUSE_SIZE);
+    return updi_nvm_read_memory(
+        &session->link, session->target.profile->eeprom_base + byte_address, data, size);
+}
+
+bool updi_session_write_eeprom(
+    UpdiSession* session,
+    uint32_t byte_address,
+    const uint8_t* data,
+    size_t size) {
+    if(!updi_session_need_prog(session)) return false;
+    const UpdiDeviceProfile* profile = session->target.profile;
+    while(size > 0) {
+        uint32_t page_mask = (uint32_t)profile->eeprom_page - 1u;
+        uint32_t page_off = byte_address & page_mask;
+        size_t chunk = profile->eeprom_page - page_off;
+        if(chunk > size) chunk = size;
+        if(!updi_nvm_write_eeprom_page(
+               &session->link, profile, byte_address, data, chunk)) {
+            return false;
+        }
+        byte_address += (uint32_t)chunk;
+        data += chunk;
+        size -= chunk;
+    }
+    return true;
+}
+
+bool updi_session_read_fuses(
+    UpdiSession* session,
+    uint8_t* fuses,
+    size_t max_count,
+    size_t* out_count) {
+    if(!updi_session_need_prog(session)) return false;
+    size_t count = session->target.profile->fuse_count;
+    if(count > max_count) count = max_count;
+    if(!updi_nvm_read_memory(
+           &session->link, session->target.profile->fuse_base, fuses, count)) {
+        return false;
+    }
+    if(out_count) *out_count = count;
+    return true;
+}
+
+bool updi_session_write_fuse(UpdiSession* session, uint8_t fuse_index, uint8_t value) {
+    if(!updi_session_need_prog(session)) return false;
+    return updi_nvm_write_fuse(&session->link, session->target.profile, fuse_index, value);
 }
 
 void updi_session_disconnect(UpdiSession* session) {

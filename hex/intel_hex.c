@@ -6,13 +6,14 @@
 
 struct IntelHexParser {
     uint32_t max_address;
+    uint16_t page_size;
     IntelHexPageCallback on_page;
     void* context;
     uint32_t base;
     bool have_page;
     bool eof;
     uint32_t page_address;
-    uint8_t page[INTEL_HEX_PAGE_SIZE];
+    uint8_t page[INTEL_HEX_MAX_PAGE_SIZE];
 };
 
 struct IntelHexWriter {
@@ -56,7 +57,7 @@ static bool hex_emit_page(IntelHexParser* parser) {
     if(!parser->have_page) return true;
     parser->have_page = false;
     if(parser->on_page == NULL) return true;
-    return parser->on_page(parser->page_address, parser->page, parser->context);
+    return parser->on_page(parser->page_address, parser->page, parser->page_size, parser->context);
 }
 
 static bool hex_place(
@@ -74,11 +75,11 @@ static bool hex_place(
         return false;
     }
 
-    uint32_t page = address & ~(uint32_t)(INTEL_HEX_PAGE_SIZE - 1u);
+    uint32_t page = address & ~(uint32_t)(parser->page_size - 1u);
     if(!parser->have_page) {
         parser->have_page = true;
         parser->page_address = page;
-        memset(parser->page, 0xFF, sizeof(parser->page));
+        memset(parser->page, 0xFF, parser->page_size);
     } else if(page != parser->page_address) {
         if(page < parser->page_address) {
             hex_set_error(error, error_size, "HEX addresses go backwards");
@@ -90,7 +91,7 @@ static bool hex_place(
         }
         parser->have_page = true;
         parser->page_address = page;
-        memset(parser->page, 0xFF, sizeof(parser->page));
+        memset(parser->page, 0xFF, parser->page_size);
     }
 
     parser->page[address - parser->page_address] = value;
@@ -99,11 +100,17 @@ static bool hex_place(
 
 IntelHexParser* intel_hex_parser_alloc(
     uint32_t max_address,
+    uint16_t page_size,
     IntelHexPageCallback on_page,
     void* context) {
+    if(page_size == 0 || page_size > INTEL_HEX_MAX_PAGE_SIZE ||
+       (page_size & (page_size - 1u)) != 0) {
+        return NULL;
+    }
     IntelHexParser* parser = calloc(1, sizeof(IntelHexParser));
     if(parser == NULL) return NULL;
     parser->max_address = max_address;
+    parser->page_size = page_size;
     parser->on_page = on_page;
     parser->context = context;
     return parser;
