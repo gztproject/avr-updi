@@ -1,0 +1,6 @@
+.ufbt/
+.vscode/
+dist/
+build/
+tests/test_intel_hex
+*.fap

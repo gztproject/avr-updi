@@ -1,0 +1,13 @@
+App(
+    appid="updi_avr128",
+    name="UPDI AVR128DA",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="updi_avr128_app",
+    stack_size=4 * 1024,
+    fap_icon="updi_10px.png",
+    fap_category="GPIO",
+    fap_description="Program AVR128DA over UPDI",
+    fap_version="0.1",
+    fap_author="Flipper",
+    sources=["*.c*", "!test_intel_hex.c"],
+)
