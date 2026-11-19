@@ -16,7 +16,7 @@ Supported UPDI NVM families: **P:0** (tinyAVR / megaAVR 0), **P:2** (AVR Dx), **
 
 ## Wiring
 
-### Bare Flipper GPIO (3.3 V only)
+**Bare Flipper GPIO (3.3 V only)**
 
 | Flipper | Target |
 | --- | --- |
@@ -27,13 +27,9 @@ Supported UPDI NVM families: **P:0** (tinyAVR / megaAVR 0), **P:2** (AVR Dx), **
 
 Do not connect a 5 V target directly to Flipper GPIO. Do not put 12 V on a GPIO pin (no HV-UPDI).
 
-### Companion level-shifter board
+**Companion level-shifter board**
 
-For 5 V targets and combined ISP/UPDI/UART breakout, use:
-
-**[gztproject/AVR_programmer_debugger](https://github.com/gztproject/AVR_programmer_debugger)**
-
-That KiCad Flipper accessory includes level shifters for AVR ISP, UPDI, and UART debugging.
+For 5 V targets and combined ISP/UPDI/UART breakout, use [gztproject/AVR_programmer_debugger](https://github.com/gztproject/AVR_programmer_debugger). That KiCad Flipper accessory includes level shifters for AVR ISP, UPDI, and UART debugging.
 
 Close the USB-UART bridge before opening the app. The app takes the selected UART and turns expansion-module detection off while it runs.
 
