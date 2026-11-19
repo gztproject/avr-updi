@@ -51,8 +51,9 @@ typedef enum {
     UpdiEventFinished = 2,
 } UpdiEvent;
 
-#define UPDI_DUMP_PATH "/ext/apps_data/updi_avr128/flash.hex"
-#define UPDI_PINS_PATH "/ext/apps_data/updi_avr128/pins.txt"
+#define UPDI_APPS_DATA_DIR "/ext/apps_data/avr_updi"
+#define UPDI_DUMP_PATH UPDI_APPS_DATA_DIR "/flash.hex"
+#define UPDI_PINS_PATH UPDI_APPS_DATA_DIR "/pins.txt"
 
 typedef struct {
     char status[40];

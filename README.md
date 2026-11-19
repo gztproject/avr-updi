@@ -1,6 +1,8 @@
-# UPDI AVR128DA
+# AVR UPDI
 
-Program AVR128DA28, AVR128DA32, AVR128DA48, and AVR128DA64 (including the S variants) from a Flipper Zero. The link is UPDI, not ISP. These parts use NVM controller P:2: 24-bit addresses, 512-byte flash pages, and word writes.
+Program AVR microcontrollers over UPDI from a Flipper Zero. The link is UPDI, not ISP.
+
+Currently supported: AVR128DA28, AVR128DA32, AVR128DA48, and AVR128DA64 (including the S variants). These parts use NVM controller P:2: 24-bit addresses, 512-byte flash pages, and word writes.
 
 ## Wiring
 
@@ -23,7 +25,7 @@ Close the USB-UART bridge before opening the app. The app takes the selected UAR
 
 - Read the signature and show the part name
 - Chip-erase, flash an Intel HEX file from the SD card, and verify it
-- Dump all 128 KB of flash to `/ext/apps_data/updi_avr128/flash.hex`
+- Dump all 128 KB of flash to `/ext/apps_data/avr_updi/flash.hex`
 - Read the fuse bytes
 
 Chip erase clears flash. It also clears EEPROM unless the EESAVE fuse is set. Fuse and EEPROM writes are not in this version. A locked chip is erased with the NVMErase key before it can be programmed.
@@ -40,7 +42,7 @@ Install [ufbt](https://github.com/flipperdevices/flipperzero-ufbt), then from th
 ufbt
 ```
 
-Copy `dist/updi_avr128.fap` to `apps/GPIO/` on the SD card.
+Copy `dist/avr_updi.fap` to `apps/GPIO/` on the SD card.
 
 The Intel HEX assembler has a host test:
 

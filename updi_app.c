@@ -28,7 +28,7 @@ void updi_pins_load(UpdiApp* app) {
 
 void updi_pins_save(UpdiApp* app) {
     Storage* storage = furi_record_open(RECORD_STORAGE);
-    storage_simply_mkdir(storage, "/ext/apps_data/updi_avr128");
+    storage_simply_mkdir(storage, UPDI_APPS_DATA_DIR);
     File* file = storage_file_alloc(storage);
     if(storage_file_open(file, UPDI_PINS_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
         const char* text = app->pins == UpdiPins13_14 ? "13\n" : "15\n";
@@ -43,7 +43,7 @@ static void updi_progress_draw(Canvas* canvas, void* model) {
     UpdiProgressModel* progress = model;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 12, "UPDI AVR128DA");
+    canvas_draw_str(canvas, 2, 12, "AVR UPDI");
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 2, 28, progress->status);
 
@@ -137,7 +137,7 @@ static void updi_app_free(UpdiApp* app) {
     free(app);
 }
 
-int32_t updi_avr128_app(void* arg) {
+int32_t avr_updi_app(void* arg) {
     UNUSED(arg);
     UpdiApp* app = updi_app_alloc();
     view_dispatcher_run(app->view_dispatcher);

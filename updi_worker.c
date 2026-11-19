@@ -291,7 +291,7 @@ static void updi_worker_dump(UpdiApp* app, UpdiSession* session) {
     if(!updi_require_known(app, updi_session_target(session), false)) return;
 
     Storage* storage = furi_record_open(RECORD_STORAGE);
-    storage_simply_mkdir(storage, "/ext/apps_data/updi_avr128");
+    storage_simply_mkdir(storage, UPDI_APPS_DATA_DIR);
     File* file = storage_file_alloc(storage);
     bool opened =
         storage_file_open(file, UPDI_DUMP_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS);

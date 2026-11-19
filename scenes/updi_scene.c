@@ -51,7 +51,7 @@ static void updi_menu_callback(void* context, uint32_t index) {
         if(!updi_confirm(
                app,
                "Dump flash?",
-               "Writes 128KB to\napps_data/updi_avr128/\nflash.hex",
+               "Writes 128KB to\napps_data/avr_updi/\nflash.hex",
                "Dump")) {
             return;
         }
