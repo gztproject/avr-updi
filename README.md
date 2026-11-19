@@ -9,7 +9,7 @@ Program AVR microcontrollers over **UPDI** from a Flipper Zero. This is not ISP 
 - Flash an Intel HEX file (chip erase + verify)
 - Read / write EEPROM
 - Read fuses; write a single fuse (double-confirmed)
-- USB **SerialUPDI** bridge for avrdude / pymcuprog (`-c serialupdi`)
+- USB **SerialUPDI** bridge for avrdude / pymcuprog (-c serialupdi)
 - Pin pair 15/16 or 13/14
 
 Supported UPDI NVM families: **P:0** (tinyAVR / megaAVR 0), **P:2** (AVR Dx), **P:3** (AVR EA), **P:4** (AVR DU). Unknown signatures are identified by SIB but refuse flash/dump until listed in the device table.
@@ -35,39 +35,22 @@ Close the USB-UART bridge before opening the app. The app takes the selected UAR
 
 ## Dump layout
 
-Dumps are written under `/ext/apps_data/avr_updi/<name>/`:
+Dumps are written under /ext/apps_data/avr_updi/name/:
 
-- `flash.hex`
-- `eeprom.hex`
-- `fuses.txt`
+- flash.hex
+- eeprom.hex
+- fuses.txt
 
 ## SerialUPDI (USB)
 
-**SerialUPDI (USB)** exposes a second USB CDC port. Wire UPDI as above, then on the host:
-
-```sh
-avrdude -c serialupdi -P /dev/ttyACM1 -p avr128da28 -U flash:w:firmware.hex:i
-```
-
-Exact port name depends on your OS. Baud defaults to 115200 8E2.
+**SerialUPDI (USB)** exposes a second USB CDC port. Wire UPDI as above, then on the host run avrdude with -c serialupdi on the new COM/tty port. Exact port name depends on your OS. Baud defaults to 115200 8E2.
 
 ## Build
 
-Install [ufbt](https://github.com/flipperdevices/flipperzero-ufbt), then from this directory:
+Install [ufbt](https://github.com/flipperdevices/flipperzero-ufbt), then from this directory run ufbt. Copy dist/avr_updi.fap to apps/GPIO/ on the SD card.
 
-```sh
-ufbt
-```
-
-Copy `dist/avr_updi.fap` to `apps/GPIO/` on the SD card.
-
-Host HEX tests:
-
-```sh
-cc -std=c11 -Wall -Wextra -Werror -I. tests/test_intel_hex.c hex/intel_hex.c -o tests/test_intel_hex
-./tests/test_intel_hex
-```
+Host HEX tests: compile tests/test_intel_hex.c with hex/intel_hex.c and run the binary.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see LICENSE.
