@@ -13,6 +13,10 @@ static void updi_link_error(UpdiLink* link, const char* message) {
     }
 }
 
+static uint8_t updi_link_addr_mode(const UpdiLink* link) {
+    return link->addr_bytes == 2 ? UPDI_ADDRESS_16 : UPDI_ADDRESS_24;
+}
+
 static bool updi_link_phy(UpdiLink* link, const uint8_t* data, size_t size) {
     if(!updi_transport_send(link->transport, data, size)) {
         updi_link_error(link, updi_transport_error(link->transport));
@@ -33,6 +37,11 @@ void updi_link_init(UpdiLink* link, UpdiTransport* transport, char* error, size_
     link->transport = transport;
     link->error = error;
     link->error_size = error_size;
+    link->addr_bytes = 3;
+}
+
+void updi_link_set_addr_bytes(UpdiLink* link, uint8_t addr_bytes) {
+    link->addr_bytes = addr_bytes == 2 ? 2 : 3;
 }
 
 bool updi_link_ldcs(UpdiLink* link, uint8_t address, uint8_t* value) {
@@ -129,41 +138,41 @@ static bool updi_link_ack(UpdiLink* link) {
     return true;
 }
 
+static size_t updi_link_pack_address(UpdiLink* link, uint8_t* frame, uint32_t address) {
+    frame[0] = (uint8_t)address;
+    frame[1] = (uint8_t)(address >> 8);
+    if(link->addr_bytes == 2) return 2;
+    frame[2] = (uint8_t)(address >> 16);
+    return 3;
+}
+
 bool updi_link_st8(UpdiLink* link, uint32_t address, uint8_t value) {
-    uint8_t frame[5] = {
-        UPDI_PHY_SYNC,
-        (uint8_t)(UPDI_STS | UPDI_ADDRESS_24 | UPDI_DATA_8),
-        (uint8_t)address,
-        (uint8_t)(address >> 8),
-        (uint8_t)(address >> 16),
-    };
-    if(!updi_link_phy(link, frame, sizeof(frame))) return false;
+    uint8_t frame[6];
+    frame[0] = UPDI_PHY_SYNC;
+    frame[1] = (uint8_t)(UPDI_STS | updi_link_addr_mode(link) | UPDI_DATA_8);
+    size_t n = 2 + updi_link_pack_address(link, &frame[2], address);
+    if(!updi_link_phy(link, frame, n)) return false;
     if(!updi_link_ack(link)) return false;
     if(!updi_link_phy(link, &value, 1)) return false;
     return updi_link_ack(link);
 }
 
 bool updi_link_ld8(UpdiLink* link, uint32_t address, uint8_t* value) {
-    uint8_t frame[5] = {
-        UPDI_PHY_SYNC,
-        (uint8_t)(UPDI_LDS | UPDI_ADDRESS_24 | UPDI_DATA_8),
-        (uint8_t)address,
-        (uint8_t)(address >> 8),
-        (uint8_t)(address >> 16),
-    };
-    if(!updi_link_phy(link, frame, sizeof(frame))) return false;
+    uint8_t frame[6];
+    frame[0] = UPDI_PHY_SYNC;
+    frame[1] = (uint8_t)(UPDI_LDS | updi_link_addr_mode(link) | UPDI_DATA_8);
+    size_t n = 2 + updi_link_pack_address(link, &frame[2], address);
+    if(!updi_link_phy(link, frame, n)) return false;
     return updi_link_phy_recv(link, value, 1, 200);
 }
 
 static bool updi_link_st_ptr(UpdiLink* link, uint32_t address) {
-    uint8_t frame[5] = {
-        UPDI_PHY_SYNC,
-        (uint8_t)(UPDI_ST | UPDI_PTR_ADDRESS | UPDI_DATA_24),
-        (uint8_t)address,
-        (uint8_t)(address >> 8),
-        (uint8_t)(address >> 16),
-    };
-    if(!updi_link_phy(link, frame, sizeof(frame))) return false;
+    uint8_t frame[6];
+    frame[0] = UPDI_PHY_SYNC;
+    uint8_t data_sz = link->addr_bytes == 2 ? UPDI_DATA_16 : UPDI_DATA_24;
+    frame[1] = (uint8_t)(UPDI_ST | UPDI_PTR_ADDRESS | data_sz);
+    size_t n = 2 + updi_link_pack_address(link, &frame[2], address);
+    if(!updi_link_phy(link, frame, n)) return false;
     return updi_link_ack(link);
 }
 
@@ -204,14 +213,11 @@ bool updi_link_write_words(UpdiLink* link, uint32_t address, const uint8_t* data
     }
 
     if(size == 2) {
-        uint8_t frame[5] = {
-            UPDI_PHY_SYNC,
-            (uint8_t)(UPDI_STS | UPDI_ADDRESS_24 | UPDI_DATA_16),
-            (uint8_t)address,
-            (uint8_t)(address >> 8),
-            (uint8_t)(address >> 16),
-        };
-        if(!updi_link_phy(link, frame, sizeof(frame))) return false;
+        uint8_t frame[6];
+        frame[0] = UPDI_PHY_SYNC;
+        frame[1] = (uint8_t)(UPDI_STS | updi_link_addr_mode(link) | UPDI_DATA_16);
+        size_t n = 2 + updi_link_pack_address(link, &frame[2], address);
+        if(!updi_link_phy(link, frame, n)) return false;
         if(!updi_link_ack(link)) return false;
         if(!updi_link_phy(link, data, 2)) return false;
         return updi_link_ack(link);
@@ -222,6 +228,27 @@ bool updi_link_write_words(UpdiLink* link, uint32_t address, const uint8_t* data
     if(!updi_link_set_ack(link, false)) return false;
 
     uint8_t header[2] = {UPDI_PHY_SYNC, (uint8_t)(UPDI_ST | UPDI_PTR_INC | UPDI_DATA_16)};
+    bool ok = updi_link_phy(link, header, sizeof(header));
+    if(ok) ok = updi_link_phy(link, data, size);
+    if(!updi_link_set_ack(link, true)) return false;
+    return ok;
+}
+
+bool updi_link_write_bytes(UpdiLink* link, uint32_t address, const uint8_t* data, size_t size) {
+    if(size == 0 || size > 64u) {
+        updi_link_error(link, "Bad byte write chunk");
+        return false;
+    }
+
+    if(size == 1) {
+        return updi_link_st8(link, address, data[0]);
+    }
+
+    if(!updi_link_st_ptr(link, address)) return false;
+    if(!updi_link_repeat(link, size)) return false;
+    if(!updi_link_set_ack(link, false)) return false;
+
+    uint8_t header[2] = {UPDI_PHY_SYNC, (uint8_t)(UPDI_ST | UPDI_PTR_INC | UPDI_DATA_8)};
     bool ok = updi_link_phy(link, header, sizeof(header));
     if(ok) ok = updi_link_phy(link, data, size);
     if(!updi_link_set_ack(link, true)) return false;

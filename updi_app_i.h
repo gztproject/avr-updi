@@ -11,6 +11,7 @@
 #include <gui/modules/variable_item_list.h>
 #include <gui/modules/widget.h>
 #include <gui/modules/text_box.h>
+#include <gui/modules/text_input.h>
 
 #include <furi.h>
 
@@ -20,30 +21,44 @@ typedef enum {
     UpdiViewWidget,
     UpdiViewProgress,
     UpdiViewText,
+    UpdiViewTextInput,
 } UpdiView;
 
 typedef enum {
     UpdiSceneMenu,
     UpdiScenePins,
     UpdiSceneWiring,
+    UpdiSceneAbout,
+    UpdiSceneDetect,
+    UpdiSceneDumpName,
+    UpdiSceneFuseWrite,
+    UpdiSceneProgrammer,
     UpdiSceneWork,
     UpdiSceneCount,
 } UpdiScene;
 
 typedef enum {
-    UpdiMenuRead,
-    UpdiMenuFlash,
+    UpdiMenuDetect,
     UpdiMenuDump,
+    UpdiMenuFlash,
+    UpdiMenuReadEeprom,
+    UpdiMenuWriteEeprom,
     UpdiMenuFuses,
+    UpdiMenuWriteFuse,
+    UpdiMenuProgrammer,
     UpdiMenuPins,
     UpdiMenuWiring,
+    UpdiMenuAbout,
 } UpdiMenuIndex;
 
 typedef enum {
-    UpdiOpRead,
+    UpdiOpDetect,
     UpdiOpFlash,
     UpdiOpDump,
     UpdiOpFuses,
+    UpdiOpReadEeprom,
+    UpdiOpWriteEeprom,
+    UpdiOpWriteFuse,
 } UpdiOp;
 
 typedef enum {
@@ -52,8 +67,8 @@ typedef enum {
 } UpdiEvent;
 
 #define UPDI_APPS_DATA_DIR "/ext/apps_data/avr_updi"
-#define UPDI_DUMP_PATH UPDI_APPS_DATA_DIR "/flash.hex"
 #define UPDI_PINS_PATH UPDI_APPS_DATA_DIR "/pins.txt"
+#define UPDI_DUMP_NAME_LEN 32
 
 typedef struct {
     char status[40];
@@ -71,9 +86,11 @@ typedef struct UpdiApp {
     Widget* widget;
     View* progress;
     TextBox* text_box;
+    TextInput* text_input;
     FuriThread* thread;
     FuriMutex* mutex;
     FuriString* hex_path;
+    FuriString* eeprom_path;
 
     UpdiOp op;
     UpdiPins pins;
@@ -83,9 +100,20 @@ typedef struct UpdiApp {
     char status[40];
     uint8_t percent;
     char result[1024];
+
+    char dump_name[UPDI_DUMP_NAME_LEN];
+    uint8_t fuse_index;
+    uint8_t fuse_value;
+    char fuse_input[16];
+    bool usb_connected;
+    void* usb_bridge;
 } UpdiApp;
 
 int32_t updi_worker(void* context);
 void updi_pins_load(UpdiApp* app);
 void updi_pins_save(UpdiApp* app);
 const char* updi_pins_label(UpdiPins pins);
+
+void updi_usb_bridge_scene_on_enter(void* context);
+bool updi_usb_bridge_scene_on_event(void* context, SceneManagerEvent event);
+void updi_usb_bridge_scene_on_exit(void* context);

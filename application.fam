@@ -7,7 +7,7 @@ App(
     fap_icon="updi_10px.png",
     fap_category="GPIO",
     fap_description="Program AVR microcontrollers over UPDI",
-    fap_version="0.1",
-    fap_author="Flipper",
+    fap_version="0.2",
+    fap_author="gztproject",
     sources=["*.c*", "!test_intel_hex.c"],
 )

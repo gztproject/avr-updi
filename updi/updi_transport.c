@@ -128,13 +128,18 @@ bool updi_transport_recv(
     return true;
 }
 
-bool updi_transport_send(UpdiTransport* transport, const uint8_t* data, size_t size) {
+bool updi_transport_send_raw(UpdiTransport* transport, const uint8_t* data, size_t size) {
     if(!transport->open || data == NULL) {
         updi_transport_set_error(transport, "UART is closed");
         return false;
     }
     furi_hal_serial_tx(transport->serial, data, size);
     furi_hal_serial_tx_wait_complete(transport->serial);
+    return true;
+}
+
+bool updi_transport_send(UpdiTransport* transport, const uint8_t* data, size_t size) {
+    if(!updi_transport_send_raw(transport, data, size)) return false;
     uint8_t echo[32];
     size_t left = size;
     while(left > 0) {
@@ -143,6 +148,19 @@ bool updi_transport_send(UpdiTransport* transport, const uint8_t* data, size_t s
         left -= chunk;
     }
     return true;
+}
+
+size_t updi_transport_recv_available(
+    UpdiTransport* transport,
+    uint8_t* data,
+    size_t max_size,
+    uint32_t timeout_ms) {
+    if(!transport->open || data == NULL || max_size == 0) return 0;
+    return furi_stream_buffer_receive(transport->rx, data, max_size, furi_ms_to_ticks(timeout_ms));
+}
+
+bool updi_transport_is_open(const UpdiTransport* transport) {
+    return transport != NULL && transport->open;
 }
 
 void updi_transport_flush_rx(UpdiTransport* transport) {

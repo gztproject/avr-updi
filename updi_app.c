@@ -76,6 +76,8 @@ static UpdiApp* updi_app_alloc(void) {
 
     app->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
     app->hex_path = furi_string_alloc();
+    app->eeprom_path = furi_string_alloc();
+    snprintf(app->dump_name, sizeof(app->dump_name), "dump");
     updi_pins_load(app);
     app->dialogs = furi_record_open(RECORD_DIALOGS);
 
@@ -106,6 +108,10 @@ static UpdiApp* updi_app_alloc(void) {
     view_dispatcher_add_view(
         app->view_dispatcher, UpdiViewText, text_box_get_view(app->text_box));
 
+    app->text_input = text_input_alloc();
+    view_dispatcher_add_view(
+        app->view_dispatcher, UpdiViewTextInput, text_input_get_view(app->text_input));
+
     app->gui = furi_record_open(RECORD_GUI);
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
     scene_manager_next_scene(app->scene_manager, UpdiSceneMenu);
@@ -118,18 +124,21 @@ static void updi_app_free(UpdiApp* app) {
     view_dispatcher_remove_view(app->view_dispatcher, UpdiViewWidget);
     view_dispatcher_remove_view(app->view_dispatcher, UpdiViewProgress);
     view_dispatcher_remove_view(app->view_dispatcher, UpdiViewText);
+    view_dispatcher_remove_view(app->view_dispatcher, UpdiViewTextInput);
 
     submenu_free(app->submenu);
     variable_item_list_free(app->var_list);
     widget_free(app->widget);
     view_free(app->progress);
     text_box_free(app->text_box);
+    text_input_free(app->text_input);
     view_dispatcher_free(app->view_dispatcher);
     scene_manager_free(app->scene_manager);
 
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_DIALOGS);
     furi_string_free(app->hex_path);
+    furi_string_free(app->eeprom_path);
     furi_mutex_free(app->mutex);
 
     expansion_enable(app->expansion);
