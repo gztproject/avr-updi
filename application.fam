@@ -9,5 +9,6 @@ App(
     fap_description="Program AVR microcontrollers over UPDI",
     fap_version="0.2",
     fap_author="gztproject",
+    fap_weburl="https://github.com/gztproject/avr-updi",
     sources=["*.c*", "!test_intel_hex.c"],
 )

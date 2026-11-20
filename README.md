@@ -1,6 +1,6 @@
 # AVR UPDI
 
-Program AVR microcontrollers over **UPDI** from a Flipper Zero. This is not ISP — for classic SPI/ISP (ATmega328P and similar) use the Flipper [AVR ISP Programmer](https://lab.flipper.net/apps/avr_isp) app.
+Program AVR microcontrollers over **UPDI** from a Flipper Zero. This is not ISP - for classic SPI/ISP (ATmega328P and similar) use the Flipper [AVR ISP Programmer](https://lab.flipper.net/apps/avr_isp) app.
 
 ## Features
 
@@ -53,4 +53,4 @@ Host HEX tests: compile tests/test_intel_hex.c with hex/intel_hex.c and run the 
 
 ## License
 
-MIT — see LICENSE.
+MIT - see LICENSE.
