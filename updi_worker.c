@@ -44,6 +44,7 @@ static void updi_finish(UpdiApp* app) {
     view_dispatcher_send_custom_event(app->view_dispatcher, UpdiEventFinished);
 }
 
+/* Refuse flash/dump/EEPROM when the signature is not in our device table. */
 static bool updi_require_known(UpdiApp* app, const UpdiTargetInfo* target, bool erased) {
     if(target->known && target->profile != NULL) return true;
     if(erased) {
@@ -65,6 +66,12 @@ static bool updi_require_known(UpdiApp* app, const UpdiTargetInfo* target, bool 
     return false;
 }
 
+/*
+ * Flash programming walks the same HEX three times via hex_on_page:
+ *   Count  – reject empty files and drive progress; no NVM traffic
+ *   Write  – program each page after a chip erase
+ *   Verify – read back and compare; holes are 0xFF on both sides
+ */
 typedef enum {
     HexPassCount,
     HexPassWrite,
@@ -107,6 +114,7 @@ static bool hex_on_page(
         return true;
     }
 
+    /* HexPassVerify */
     uint8_t chip[INTEL_HEX_MAX_PAGE_SIZE];
     if(!updi_session_read_flash(job->session, address, chip, job->profile->flash_page)) {
         job->failed = true;
@@ -209,6 +217,7 @@ typedef struct {
     uint32_t pages;
 } EepromJob;
 
+/* HEX addresses are relative to EEPROM start (same convention as dumps). */
 static bool eeprom_on_page(
     uint32_t address,
     const uint8_t* data,
@@ -236,6 +245,7 @@ static bool dump_write_line(const char* line, void* context) {
     return storage_file_write(file, "\n", 1) == 1;
 }
 
+/* Read flash or EEPROM in chunks and stream Intel HEX to SD. */
 static bool dump_memory_hex(
     UpdiApp* app,
     UpdiSession* session,
@@ -657,7 +667,11 @@ static void updi_worker_flash(UpdiApp* app, UpdiSession* session) {
     bool ok = job != NULL;
     if(!ok) snprintf(parse_error, sizeof(parse_error), "Out of memory");
 
-    /* For locked chips, validate HEX against a temporary max size until unlocked. */
+    /*
+     * Locked parts refuse signature reads. Pre-validate the HEX against a
+     * generous provisional map, then NVMErase-key unlock (destroys flash) and
+     * re-identify before the real count/write/verify passes.
+     */
     const UpdiDeviceProfile* provisional = updi_session_target(session)->profile;
     if(ok && provisional == NULL && status != UpdiConnectLocked) {
         snprintf(parse_error, sizeof(parse_error), "Unknown device");
@@ -665,7 +679,6 @@ static void updi_worker_flash(UpdiApp* app, UpdiSession* session) {
     }
 
     if(ok && status == UpdiConnectLocked) {
-        /* Count with max 128K/512 until we know the part after unlock. */
         static const UpdiDeviceProfile locked_probe = {
             .name = "locked",
             .flash_size = 128u * 1024u,
@@ -730,6 +743,7 @@ static void updi_worker_flash(UpdiApp* app, UpdiSession* session) {
 
     uint32_t pages = ok ? job->pages : 0;
 
+    /* Full-chip erase so sparse HEX pages do not leave stale bytes behind. */
     if(ok) {
         if(!updi_report(app, "Erasing chip", 30)) {
             snprintf(parse_error, sizeof(parse_error), "Cancelled");

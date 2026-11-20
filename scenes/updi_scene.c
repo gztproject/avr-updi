@@ -284,6 +284,7 @@ static void updi_fuse_input_callback(void* context) {
     if(index > 255 || value > 255) return;
     app->fuse_index = (uint8_t)index;
     app->fuse_value = (uint8_t)value;
+    /* Two confirms: fuse mistakes (e.g. PDICFG) can permanently lock UPDI out. */
     if(!updi_confirm(
            app,
            "Write fuse?",
